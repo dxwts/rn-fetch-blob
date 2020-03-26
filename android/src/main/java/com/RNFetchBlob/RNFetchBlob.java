@@ -411,4 +411,9 @@ public class RNFetchBlob extends ReactContextBaseJavaModule {
     public void getSDCardApplicationDir(Promise promise) {
         RNFetchBlobFS.getSDCardApplicationDir(this.getReactApplicationContext(), promise);
     }
+
+    @ReactMethod
+    public void split(String src, int chunkSize, Promise promise) {
+        RNFetchBlobFS.split(src, chunkSize, promise);
+    }
 }

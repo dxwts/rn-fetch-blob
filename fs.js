@@ -402,6 +402,15 @@ function df(): Promise<{ free: number, total: number }> {
   })
 }
 
+function split(src: string, chunkSize: number): Promise {
+  console.log(src)
+  console.log(chunkSize)
+  if (typeof src !== 'string' || typeof chunkSize !== 'number') {
+    return reject(addCode('EINVAL', new TypeError('Missing argument "src"')))
+  }
+  return RNFetchBlob.split(src, chunkSize)
+}
+
 export default {
   RNFetchBlobSession,
   unlink,
@@ -427,5 +436,6 @@ export default {
   dirs,
   slice,
   asset,
-  df
+  df,
+  split
 }

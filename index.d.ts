@@ -393,6 +393,7 @@ export interface FS {
     slice(src: string, dest: string, start: number, end: number): Promise<void>;
     asset(path: string): string;
     df(): Promise<{ free: number, total: number }>;
+    split(src: string, chunkSize: number): Promise<string[]>;
 }
 
 export interface Dirs {

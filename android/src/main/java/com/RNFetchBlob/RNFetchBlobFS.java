@@ -9,6 +9,7 @@ import android.os.Environment;
 import android.os.StatFs;
 import android.os.SystemClock;
 import android.util.Base64;
+import android.util.Log;
 
 import com.RNFetchBlob.Utils.PathResolver;
 import com.facebook.react.bridge.Arguments;
@@ -1148,6 +1149,107 @@ class RNFetchBlobFS {
         }
         else
             return PathResolver.getRealPathFromURI(RNFetchBlob.RCTContext, uri);
+    }
+
+    static String md5(String path) {
+        try {
+
+            File file = new File(path);
+
+            if (file.isDirectory()) {
+                return null;
+            }
+
+            if (!file.exists()) {
+                return null;
+            }
+
+            MessageDigest md = MessageDigest.getInstance("MD5");
+
+            FileInputStream inputStream = new FileInputStream(path);
+            int chunkSize = 4096 * 256; // 1Mb
+            byte[] buffer = new byte[chunkSize];
+
+            if(file.length() != 0) {
+                int bytesRead;
+                while ((bytesRead = inputStream.read(buffer)) != -1) {
+                    md.update(buffer, 0, bytesRead);
+                }
+            }
+
+            StringBuilder hexString = new StringBuilder();
+            for (byte digestByte : md.digest())
+                hexString.append(String.format("%02x", digestByte));
+
+            return hexString.toString();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+
+    static void split(String path, int chunkSize, Promise promise) {
+         try {
+             path = normalizePath(path);
+             File source = new File(path);
+             if(source.isDirectory()){
+                 promise.reject("EISDIR", "Expecting a file but '" + path + "' is a directory");
+                 return;
+             }
+             if(!source.exists()){
+                 promise.reject("ENOENT", "No such file '" + path + "'");
+                 return;
+             }
+             String fileMd5 = md5(path);
+             int size = (int) source.length();
+             int splitNum = (int)Math.ceil(Double.valueOf(size)/Double.valueOf(chunkSize));
+             
+             byte[] buffer = new byte[2048];
+             int offset = 0;
+             String[] files = new String[splitNum];
+             for (int i = 0; i < splitNum; i++) {
+                 offset = chunkSize * i;
+                 String tmpFilePath = Environment.getExternalStorageDirectory().getAbsolutePath() +  "/tmp/" + fileMd5 + "_" + i;
+                 files[i] = tmpFilePath;
+                 File tmpFile = new File(tmpFilePath);
+                 if (tmpFile.exists()) {
+                     tmpFile.delete();
+                 }
+                 tmpFile.getParentFile().mkdirs();
+                 tmpFile.createNewFile();
+
+                 FileInputStream in = new FileInputStream(new File(path));
+                 FileOutputStream out = new FileOutputStream(tmpFile);
+                 int skipped = (int) in.skip(offset);
+                 if (skipped != offset) {
+                     promise.reject("EUNSPECIFIED", "Skipped " + skipped + " instead of the specified " + offset + " bytes, size is " + size);
+                     return;
+                 }
+                 int end =  Math.min(size, offset + chunkSize) - offset;
+                 int start = 0;
+                 while(start < end) {
+                     int read = in.read(buffer, 0, 2048);
+                     int remain = end - start;
+                     if(read <= 0) {
+                         break;
+                     }
+                     out.write(buffer, 0, (int) Math.min(remain, read));
+                     start += read;
+                 }
+                 out.flush();
+                 out.close();
+                 in.close();
+
+             }
+             WritableArray arg = Arguments.createArray();
+             for (String i : files) {
+                 arg.pushString(i);
+             }
+             promise.resolve(arg);
+         } catch (Exception e) {
+             e.printStackTrace();
+             promise.reject("EUNSPECIFIED", e.getLocalizedMessage());
+         }
     }
 
 }
